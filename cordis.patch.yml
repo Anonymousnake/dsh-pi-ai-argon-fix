@@ -1,0 +1,4 @@
+# Load after @deepseek-ai/dsh-llm-pi-ai has registered its providers.
+- insert:
+    - id: pi-ai-argon-fix
+      name: dsh-pi-ai-argon-fix

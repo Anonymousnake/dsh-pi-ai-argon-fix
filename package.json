@@ -1,0 +1,33 @@
+{
+  "name": "dsh-pi-ai-argon-fix",
+  "version": "0.1.0",
+  "description": "Gemini 4 Argon thinkingLevel compatibility shim for DSH native Google and Vertex providers",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.mjs", "cordis.patch.yml", "README.md", "LICENSE"],
+  "scripts": {
+    "check": "node --check index.mjs",
+    "prepack": "npm run check"
+  },
+  "engines": {"node": ">=22"},
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.2.0-rc.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anonymousnake/dsh-pi-ai-argon-fix.git"
+  },
+  "bugs": {"url": "https://github.com/Anonymousnake/dsh-pi-ai-argon-fix/issues"},
+  "homepage": "https://github.com/Anonymousnake/dsh-pi-ai-argon-fix#readme",
+  "author": "Anonymousnake",
+  "license": "MIT",
+  "keywords": ["dsh", "deepseek-harness", "gemini", "argon", "vertex", "google", "cordis"],
+  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}},
+  "dshTarget": "0.2.0-rc.2"
+}

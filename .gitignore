@@ -1,0 +1,7 @@
+node_modules/
+*.bak*
+*.tgz
+.env
+.env.*
+coverage/
+.DS_Store

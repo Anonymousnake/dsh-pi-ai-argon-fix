@@ -33,17 +33,30 @@ export function install(adapter) {
 }
 
 export function apply(ctx) {
-  const adapters = new Set();
-  for (const provider of ['google', 'google-vertex']) {
-    try {
-      adapters.add(ctx.llm.registration(provider).adapter);
-    } catch (error) {
-      if (error.code !== 'NO_ADAPTER') throw error;
-    }
-  }
-  if (!adapters.size) throw new Error('Configure a google or google-vertex pi-ai provider before enabling the Argon fix');
-  for (const adapter of adapters) {
-    ctx.effect(() => install(adapter), 'pi-ai-argon-fix: restore adapter on unload');
-  }
+  // Provider routes may register after this plugin starts, so bind on the
+  // registry event instead of failing when no adapter exists yet.
+  ctx.effect(() => {
+    const installed = new Map();
+    const sync = () => {
+      for (const provider of ['google', 'google-vertex']) {
+        let adapter;
+        try {
+          adapter = ctx.llm.registration(provider).adapter;
+        } catch (error) {
+          if (error.code !== 'NO_ADAPTER') throw error;
+          continue;
+        }
+        if (installed.has(adapter)) continue;
+        installed.set(adapter, install(adapter));
+      }
+    };
+    sync();
+    const off = ctx.on('llm/adapters-updated', sync);
+    return () => {
+      off?.();
+      for (const dispose of installed.values()) dispose();
+      installed.clear();
+    };
+  }, 'pi-ai-argon-fix: argon adapter patches');
   ctx.logger.info('Argon requests now use thinkingLevel without thinkingBudget');
 }

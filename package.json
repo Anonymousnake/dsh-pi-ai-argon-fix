@@ -1,17 +1,18 @@
 {
   "name": "dsh-pi-ai-argon-fix",
-  "version": "0.1.0",
-  "description": "Gemini 4 Argon thinkingLevel compatibility shim for DSH native Google and Vertex providers",
+  "version": "0.2.0",
+  "description": "Gemini 4 Argon thinkingLevel compatibility and readable native reasoning summaries for DSH",
   "type": "module",
   "main": "./index.mjs",
   "exports": {
     ".": "./index.mjs",
+    "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "files": ["index.mjs", "cordis.patch.yml", "README.md", "LICENSE"],
+  "files": ["index.mjs", "client.js", "cordis.patch.yml", "README.md", "LICENSE"],
   "scripts": {
-    "check": "node --check index.mjs",
+    "check": "node --check index.mjs && node --check client.js",
     "prepack": "npm run check"
   },
   "engines": {"node": ">=22"},
@@ -28,6 +29,13 @@
   "author": "Anonymousnake",
   "license": "MIT",
   "keywords": ["dsh", "deepseek-harness", "gemini", "argon", "vertex", "google", "cordis"],
-  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}},
+  "dsh": {
+    "bundle": {"patch": "./cordis.patch.yml"},
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-chat", "@deepseek-ai/dsh-client-ui-renderer"],
+      "external": ["react", "@deepseek-ai/dsh-client-ui-primitives"]
+    }
+  },
   "dshTarget": "0.2.0-rc.2"
 }

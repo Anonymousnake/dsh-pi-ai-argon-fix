@@ -2,7 +2,7 @@
 
 DeepSeek Harness 的 Gemini 4 Argon 原生 Google / Vertex 协议兼容补丁。
 
-只修复 `thinkingBudget` 与 `thinkingLevel` 的选择，不改 DSH 核心、不转换成 OpenAI 协议、不接管工具调用和签名处理。零运行时依赖，许可证 MIT。
+提供 `thinkingBudget` / `thinkingLevel` 参数兼容修复，以及 Web 聊天中更清晰的 Argon 推理摘要展示。不改 DSH 核心、不转换成 OpenAI 协议、不接管工具执行和签名处理。零新增运行时依赖，许可证 MIT。
 
 ## 为什么需要
 
@@ -46,7 +46,7 @@ Thinking budget is not supported for this model. Use thinking level instead.
 ### 安装为 DSH bundle
 
 ```sh
-dsh plugin --profile web add github:Anonymousnake/dsh-pi-ai-argon-fix#v0.1.0
+dsh plugin --profile web add github:Anonymousnake/dsh-pi-ai-argon-fix#v0.2.0
 ```
 
 将 `dsh-pi-ai-argon-fix` 追加到该 profile 的 `package.json` 中 `dsh.profile.bundles` 列表，保留已有条目，并放在提供 `llm-pi-ai` 的 bundle 后面，然后重新加载或重启 profile。本包自带 `cordis.patch.yml`，会注册 `pi-ai-argon-fix` 插件。
@@ -113,6 +113,22 @@ contents / parts / functionCall / functionResponse / thoughtSignature
 - 签名经过 DSH 的 JSON 持久化形状后原样回传。
 - 当前 Web GUI 后端的真实 Agent 调用了 `pwsh`，执行结果与第二轮回复均成功入库；不是仅测一次 API 返回 200。
 - `low / medium / high` 参数映射、非目标路由隔离与插件卸载恢复完成了本地检查。
+
+## Web 推理摘要展示（0.2.0）
+
+同一个包附带 Web 客户端，使用 DSH 的 `conversation.chat.node` 公共插槽，不修改核心文件，也不通过 DOM 扫描或模拟点击实现。
+
+- 只对 `google` / `google-vertex` 的 `gemini-4-argon` 生效，其他模型沿用原渲染器。
+- `detailed` / `verbose` 模式下，打开已有外层过程分组后，内部推理摘要默认展开；不会强制展开整段历史回合。
+- 箭头始终可见，明确标注“推理摘要”和已收到的字符数，支持鼠标与键盘展开 / 收起。
+- 收起后显示正文预览，而不是只显示类似 `Creating Miku's Animation` 的标题。
+- 长摘要在面板内滚动；原正文、图片、文件卡片、工具调用和执行结果继续由 DSH 渲染。
+- 模型仍在发送摘要时显示真实等待状态，不伪造逐行代码或工具执行进度。
+- 旧会话缺少展示层 provider 字段时，从该步骤之前的请求头读取归属，不用当前模型选择来猜测历史消息。历史窗口缺少归属证据时保持原展示。
+
+本版本**不启用工具参数增量**。Vertex 的 `streamFunctionCallArguments` 会返回 `partialArgs` / `willContinue`；当前 SDK 的 Gemini 模式不接受该开关，pi-ai 0.87.1 也未组装这些增量字段。直接打开可能造成空参数或重复工具调用，因此这里仍使用完整 `functionCall.args`，只改善实际已收到内容的可见性。
+
+已在现有 DSH Web GUI 的旧会话验证完整摘要显示、字符计数、收起正文预览、键盘切换和原文件卡片保留，并完成非 Argon 路由隔离检查。Headless 使用宿主参数修复，不加载 Web 客户端。
 
 ## 本地检查
 

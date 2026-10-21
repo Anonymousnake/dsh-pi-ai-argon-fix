@@ -3,35 +3,13 @@ export const inject = ['llm'];
 
 const SKIP_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
-function normalizeReplayPayload(payload) {
+function ensureThoughtSignatures(payload) {
   if (!Array.isArray(payload?.contents)) return payload;
   let changed = false;
   const contents = payload.contents.map((content) => {
     if (!Array.isArray(content?.parts)) return content;
     let contentChanged = false;
-    let replayParts = content.parts;
-    if (content.role === 'model') {
-      const first = replayParts.findIndex((part) => part?.functionCall);
-      const last = replayParts.findLastIndex((part) => part?.functionCall);
-      const middle = replayParts.slice(first, last + 1);
-      const isCommentary = (part) => typeof part?.text === 'string' &&
-        part.thought !== true && !part.thoughtSignature &&
-        Object.keys(part).every((key) => key === 'text' || key === 'thought');
-      if (first >= 0 && middle.some(isCommentary) &&
-          middle.every((part) => part?.functionCall || isCommentary(part))) {
-        // CPA clears sibling sentinels; intervening text then starts an unsigned call group.
-        // Move only unsigned commentary, retaining every call and its original signature.
-        replayParts = [
-          ...replayParts.slice(0, first),
-          ...middle.filter(isCommentary),
-          ...middle.filter((part) => part.functionCall),
-          ...replayParts.slice(last + 1),
-        ];
-        changed = true;
-        contentChanged = true;
-      }
-    }
-    const parts = replayParts.map((part) => {
+    const parts = content.parts.map((part) => {
       if (!part?.functionCall || part.thoughtSignature) return part;
       changed = true;
       contentChanged = true;
@@ -59,7 +37,7 @@ function patchWireBody(body) {
   } catch {
     return body;
   }
-  const patched = normalizeReplayPayload(payload);
+  const patched = ensureThoughtSignatures(payload);
   if (patched === payload) return body;
   const next = JSON.stringify(patched);
   return binary ? new TextEncoder().encode(next) : next;
@@ -96,7 +74,7 @@ export function install(adapter) {
     models.streamSimple = (model, context, options) => upstream.streamSimple(model, context, {
       ...options,
       async onPayload(params, wireModel) {
-        const payload = normalizeReplayPayload(await options.onPayload?.(params, wireModel) ?? params);
+        const payload = ensureThoughtSignatures(await options.onPayload?.(params, wireModel) ?? params);
         const thinkingConfig = { ...payload.config?.thinkingConfig, includeThoughts: true };
         delete thinkingConfig.thinkingBudget;
         const effort = options.reasoning ?? 'low';

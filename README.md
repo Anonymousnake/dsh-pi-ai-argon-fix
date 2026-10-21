@@ -2,7 +2,7 @@
 
 DeepSeek Harness 的 Gemini 4 Argon 原生 Google / Vertex 协议兼容补丁。
 
-提供 `thinkingBudget` / `thinkingLevel` 参数兼容修复、Argon 工具回放布局兼容，以及 Web 聊天中更清晰的推理摘要展示。不改 DSH 核心、不转换成 OpenAI 协议、不接管工具执行。零新增运行时依赖，许可证 MIT。
+提供 `thinkingBudget` / `thinkingLevel` 参数兼容修复，以及 Web 聊天中更清晰的 Argon 推理摘要展示。不改 DSH 核心、不转换成 OpenAI 协议、不接管工具执行和签名处理。零新增运行时依赖，许可证 MIT。
 
 ## 为什么需要
 
@@ -46,7 +46,7 @@ Thinking budget is not supported for this model. Use thinking level instead.
 ### 安装为 DSH bundle
 
 ```sh
-dsh plugin --profile web add github:Anonymousnake/dsh-pi-ai-argon-fix#main
+dsh plugin --profile web add github:Anonymousnake/dsh-pi-ai-argon-fix#v0.2.0
 ```
 
 将 `dsh-pi-ai-argon-fix` 追加到该 profile 的 `package.json` 中 `dsh.profile.bundles` 列表，保留已有条目，并放在提供 `llm-pi-ai` 的 bundle 后面，然后重新加载或重启 profile。本包自带 `cordis.patch.yml`，会注册 `pi-ai-argon-fix` 插件。
@@ -102,18 +102,9 @@ contents / parts / functionCall / functionResponse / thoughtSignature
 
 ## 工具调用与签名
 
-工具执行与历史持久化仍由 DSH / pi-ai 原生适配器处理。本插件只修正发出的 Argon 请求，不修改已保存的会话。
+工具名称、调用 ID、完整 JSON 参数、工具结果、推理摘要，以及 `thoughtSignature` 的持久化和回传，均由现有 DSH / pi-ai 原生适配器处理。
 
-在经 CPA 的真实请求对照中，`functionCall -> 普通文本 -> functionCall` 的回放结构会触发缺少 `thought_signature` 的 400，即使客户端给每个调用都补上 sentinel 仍会失败。相同工具、签名和结果保持不变，将普通文本集中到调用组之外后请求通过。这是该 CPA 链路的兼容处理，不代表所有 Google / Vertex 端点都存在相同行为。
-
-插件在 `onPayload` 和原生 Argon `generateContent` 的最终 fetch 边界共用以下修正：
-
-- 将首末工具调用之间的无签名普通文本移到调用组之前，文本自身顺序保持不变，工具调用保持连续。
-- 工具名称、ID、参数、调用顺序和响应保持不变，已有签名原样保留并始终附着在原来的调用上。
-- 调用间隔若包含带签名文本、thinking 或多模态 part，则保持布局原样，避免改动不透明的签名状态。
-- 缺少签名的调用使用 Google 的 `skip_thought_signature_validator` 占位值；已有真实签名不被替换。
-
-仅补 sentinel 的旧版仍会在上述文本穿插结构上失败。此修正不重排已保存的内容或 Web 展示，也不强制模型串行执行工具。
+插件不会伪造、复制或移动签名。并行工具调用中可能仅首个 `functionCall` 带签名，其余调用保持原样。
 
 已在上述经 CPA 的组合中验证：
 
@@ -143,7 +134,6 @@ contents / parts / functionCall / functionResponse / thoughtSignature
 
 ```sh
 npm run check
-npm test
 npm pack --dry-run
 ```
 

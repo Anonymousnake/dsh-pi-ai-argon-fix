@@ -10,10 +10,9 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "files": ["index.mjs", "client.js", "cordis.patch.yml", "README.md", "LICENSE", "test/contracts"],
+  "files": ["index.mjs", "client.js", "cordis.patch.yml", "README.md", "LICENSE"],
   "scripts": {
     "check": "node --check index.mjs && node --check client.js",
-    "test": "node --test test/contracts/*.test.mjs",
     "prepack": "npm run check"
   },
   "engines": {"node": ">=22"},

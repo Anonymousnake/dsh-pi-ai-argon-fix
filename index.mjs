@@ -20,6 +20,48 @@ function ensureThoughtSignatures(payload) {
   return changed ? { ...payload, contents } : payload;
 }
 
+function patchWireBody(body) {
+  let text;
+  let binary = false;
+  if (typeof body === 'string') {
+    text = body;
+  } else if (body instanceof Uint8Array) {
+    text = new TextDecoder().decode(body);
+    binary = true;
+  } else {
+    return body;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return body;
+  }
+  const patched = ensureThoughtSignatures(payload);
+  if (patched === payload) return body;
+  const next = JSON.stringify(patched);
+  return binary ? new TextEncoder().encode(next) : next;
+}
+
+function installWirePatch() {
+  const originalFetch = globalThis.fetch;
+  const patchedFetch = async function (input, init) {
+    const url = typeof input === 'string' ? input : input?.url ?? '';
+    if (!/generateContent/i.test(url) || !/gemini-4-argon/i.test(url) || !init || init.body === undefined) {
+      return originalFetch.call(this, input, init);
+    }
+    const body = patchWireBody(init.body);
+    if (body === init.body) return originalFetch.call(this, input, init);
+    const headers = new Headers(init.headers);
+    headers.delete('content-length');
+    return originalFetch.call(this, input, { ...init, body, headers });
+  };
+  globalThis.fetch = patchedFetch;
+  return () => {
+    if (globalThis.fetch === patchedFetch) globalThis.fetch = originalFetch;
+  };
+}
+
 export function install(adapter) {
   const original = adapter.streamWithSnapshot;
   if (typeof original !== 'function') throw new Error('Argon fix requires a pi-ai adapter');
@@ -55,6 +97,7 @@ export function apply(ctx) {
   // Provider routes may register after this plugin starts, so bind on the
   // registry event instead of failing when no adapter exists yet.
   ctx.effect(() => {
+    const restoreWirePatch = installWirePatch();
     const installed = new Map();
     const sync = () => {
       for (const provider of ['google', 'google-vertex']) {
@@ -73,6 +116,7 @@ export function apply(ctx) {
     const off = ctx.on('llm/adapters-updated', sync);
     return () => {
       off?.();
+      restoreWirePatch();
       for (const dispose of installed.values()) dispose();
       installed.clear();
     };

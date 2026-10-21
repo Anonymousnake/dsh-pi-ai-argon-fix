@@ -1,25 +1,6 @@
 export const name = 'pi-ai-argon-fix';
 export const inject = ['llm'];
 
-const SKIP_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
-
-function ensureThoughtSignatures(payload) {
-  if (!Array.isArray(payload?.contents)) return payload;
-  let changed = false;
-  const contents = payload.contents.map((content) => {
-    if (!Array.isArray(content?.parts)) return content;
-    let contentChanged = false;
-    const parts = content.parts.map((part) => {
-      if (!part?.functionCall || part.thoughtSignature) return part;
-      changed = true;
-      contentChanged = true;
-      return { ...part, thoughtSignature: SKIP_THOUGHT_SIGNATURE };
-    });
-    return contentChanged ? { ...content, parts } : content;
-  });
-  return changed ? { ...payload, contents } : payload;
-}
-
 export function install(adapter) {
   const original = adapter.streamWithSnapshot;
   if (typeof original !== 'function') throw new Error('Argon fix requires a pi-ai adapter');
@@ -32,7 +13,7 @@ export function install(adapter) {
     models.streamSimple = (model, context, options) => upstream.streamSimple(model, context, {
       ...options,
       async onPayload(params, wireModel) {
-        const payload = ensureThoughtSignatures(await options.onPayload?.(params, wireModel) ?? params);
+        const payload = await options.onPayload?.(params, wireModel) ?? params;
         const thinkingConfig = { ...payload.config?.thinkingConfig, includeThoughts: true };
         delete thinkingConfig.thinkingBudget;
         const effort = options.reasoning ?? 'low';

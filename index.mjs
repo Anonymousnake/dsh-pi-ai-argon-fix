@@ -1,6 +1,36 @@
 export const name = 'pi-ai-argon-fix';
 export const inject = ['llm'];
 
+/**
+ * Google rejects a model turn whose `functionCall` parts are separated by text
+ * or thinking parts, reporting it as a missing `thought_signature` at the
+ * position of the first call after the gap. The same request passes once the
+ * non-call parts sit before the calls, so hoist them and keep call order,
+ * ids, and every signature exactly as pi-ai built them.
+ */
+function hoistNonCallParts(parts) {
+  const firstCall = parts.findIndex((part) => part?.functionCall !== undefined);
+  if (firstCall <= 0) return parts;
+  const calls = parts.filter((part) => part?.functionCall !== undefined);
+  const others = parts.filter((part) => part?.functionCall === undefined);
+  // Only the interleaved case needs a rewrite: calls already trailing or leading stay untouched.
+  if (parts.slice(firstCall).every((part) => part?.functionCall !== undefined)) return parts;
+  return [...others, ...calls];
+}
+
+function normalizeContents(contents) {
+  if (!Array.isArray(contents)) return contents;
+  let changed = false;
+  const next = contents.map((content) => {
+    if (content?.role !== 'model' || !Array.isArray(content.parts)) return content;
+    const parts = hoistNonCallParts(content.parts);
+    if (parts === content.parts) return content;
+    changed = true;
+    return { ...content, parts };
+  });
+  return changed ? next : contents;
+}
+
 export function install(adapter) {
   const original = adapter.streamWithSnapshot;
   if (typeof original !== 'function') throw new Error('Argon fix requires a pi-ai adapter');
@@ -20,7 +50,8 @@ export function install(adapter) {
         const mapped = model.thinkingLevelMap?.[effort] ?? effort;
         const level = String(mapped).toUpperCase();
         thinkingConfig.thinkingLevel = ['LOW', 'MEDIUM', 'HIGH'].includes(level) ? level : 'HIGH';
-        return { ...payload, config: { ...payload.config, thinkingConfig } };
+        const contents = normalizeContents(payload.contents);
+        return { ...payload, contents, config: { ...payload.config, thinkingConfig } };
       },
     });
     // A per-call facade preserves captured snapshots and concurrent providers.

@@ -106,6 +106,19 @@ contents / parts / functionCall / functionResponse / thoughtSignature
 
 插件不会伪造、复制或移动签名。并行工具调用中可能仅首个 `functionCall` 带签名，其余调用保持原样。
 
+### 为什么会出现 “missing a thought_signature … position N”
+
+这是本路由的一个**误报错误**：真正被拒绝的不是签名缺失，而是**同一条 `model` turn 里 `functionCall` 被文本隔断**。Google 把该形状报成“第 N 个 functionCall 缺签名”，其中 N 正好是隔断之后第一个调用的位置。
+
+已在本机对同一请求体做的对照（真实上游 `gemini-4-argon` 原生端点，签名齐全）：
+
+- `text, call×5, text, call×6, text` → 连续两次 400。
+- 同样的 part 只把文本挪到调用之前，**签名一律保留** → 连续两次 200。
+
+因此插件在 `onPayload` 里只做一件事：当某条 `model` turn 的 `functionCall` 中间夹了其他 part 时，把非调用 part 上提到调用之前，调用顺序、ID、参数和每个 `thoughtSignature` 原样不动。调用本身已经连续（全部在前或全部在后）时完全不触碰请求。
+
+真实症状记录：一次 `read_image` 批量把 11 个调用拆成“5 个 + 文本 + 6 个 + 空文本”，下一个请求即返回 `function call default_api:read_image , position 77`。该位置就是第二段调用的起点。
+
 已在上述经 CPA 的组合中验证：
 
 - 无插件时发送 `thinkingBudget`，上游返回 400；有插件时发送 `thinkingLevel`，上游接受请求。
@@ -113,6 +126,7 @@ contents / parts / functionCall / functionResponse / thoughtSignature
 - 签名经过 DSH 的 JSON 持久化形状后原样回传。
 - 当前 Web GUI 后端的真实 Agent 调用了 `pwsh`，执行结果与第二轮回复均成功入库；不是仅测一次 API 返回 200。
 - `low / medium / high` 参数映射、非目标路由隔离与插件卸载恢复完成了本地检查。
+- 独立 DSH 实例（真实进程、真实工具）复现“同 turn 内 `text + 6 calls + text` 夹层 + 5 个并行调用”，连续两轮均成功，最终 `TURN: completed`；同一 payload 在补丁关闭时稳定 400。
 
 ## Web 推理摘要展示（0.2.0）
 

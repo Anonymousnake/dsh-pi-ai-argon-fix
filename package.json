@@ -1,6 +1,6 @@
 {
   "name": "dsh-pi-ai-argon-fix",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Gemini 4 Argon thinkingLevel compatibility and readable native reasoning summaries for DSH",
   "type": "module",
   "main": "./index.mjs",
